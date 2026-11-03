@@ -1,0 +1,608 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>多音轨播放器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: single-column mobile-first player, full-height app */
+:root {
+  --bg: #0e1117;
+  --surface: #161b26;
+  --card: #1e2536;
+  --accent: #5b8def;
+  --accent-glow: rgba(91, 141, 239, 0.15);
+  --danger: #ef5b5b;
+  --danger-dim: rgba(239, 91, 91, 0.12);
+  --green: #5bef8b;
+  --green-dim: rgba(91, 239, 139, 0.12);
+  --orange: #efb05b;
+  --text: #e8ecf4;
+  --text2: #7a8599;
+  --text3: #4a5568;
+  --border: rgba(255,255,255,0.06);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f5f6f8;
+    --surface: #fff;
+    --card: #edf0f5;
+    --accent: #3b6fd4;
+    --accent-glow: rgba(59, 111, 212, 0.1);
+    --danger: #d44b4b;
+    --danger-dim: rgba(212, 75, 75, 0.08);
+    --green: #2d9e55;
+    --green-dim: rgba(45, 158, 85, 0.08);
+    --orange: #c48a2e;
+    --text: #1a1f2e;
+    --text2: #6b7280;
+    --text3: #9ca3af;
+    --border: rgba(0,0,0,0.06);
+    color-scheme: light;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1117;
+  --surface: #161b26;
+  --card: #1e2536;
+  --accent: #5b8def;
+  --accent-glow: rgba(91, 141, 239, 0.15);
+  --danger: #ef5b5b;
+  --danger-dim: rgba(239, 91, 91, 0.12);
+  --green: #5bef8b;
+  --green-dim: rgba(91, 239, 139, 0.12);
+  --orange: #efb05b;
+  --text: #e8ecf4;
+  --text2: #7a8599;
+  --text3: #4a5568;
+  --border: rgba(255,255,255,0.06);
+  color-scheme: dark;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 0 14px;
+  flex-shrink: 0;
+}
+.header h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.header-icon {
+  width: 28px; height: 28px;
+  background: var(--accent-glow);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  flex: 1;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+}
+.btn:active { opacity: 0.75; transform: scale(0.97); }
+.btn-add { background: var(--accent); }
+.btn-play { background: var(--green); color: #0e1117; }
+.btn-stop { background: var(--danger); }
+
+/* Progress */
+.progress-section {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text2);
+  margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.progress-bar-wrap {
+  position: relative;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  touch-action: none;
+  cursor: pointer;
+}
+.progress-track {
+  width: 100%;
+  height: 5px;
+  background: var(--card);
+  border-radius: 3px;
+  position: relative;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  width: 0%;
+  pointer-events: none;
+  transition: width 0.05s linear;
+}
+.progress-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: left 0.05s linear;
+}
+
+/* Track list */
+.track-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 20px;
+  min-height: 0;
+}
+.track-card {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+.track-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.track-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.btn-mute {
+  border: none;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--green-dim);
+  color: var(--green);
+  min-width: 40px;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+}
+.btn-mute.muted {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+.btn-del {
+  border: none;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text3);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+}
+.btn-del:active { color: var(--danger); background: var(--danger-dim); }
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.volume-icon {
+  font-size: 0.8rem;
+  color: var(--text3);
+  width: 18px;
+  text-align: center;
+}
+.volume-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--card);
+  border-radius: 2px;
+  outline: none;
+}
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+.volume-val {
+  font-size: 0.75rem;
+  color: var(--text2);
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.empty-hint {
+  text-align: center;
+  color: var(--text3);
+  margin-top: 25vh;
+  font-size: 0.9rem;
+  line-height: 2;
+}
+.empty-hint span { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+input[type="file"] { display: none; }
+</style>
+
+<div class="header">
+  <div class="header-icon">♪</div>
+  <h1>多音轨播放器</h1>
+</div>
+
+<div class="controls">
+  <button class="btn btn-add" id="addBtn">+ 添加</button>
+  <button class="btn btn-play" id="playBtn">▶ 播放</button>
+  <button class="btn btn-stop" id="stopBtn">⏹ 停止</button>
+</div>
+
+<div class="progress-section">
+  <div class="time-row">
+    <span id="timeCurrent">00:00</span>
+    <span id="timeTotal">00:00</span>
+  </div>
+  <div class="progress-bar-wrap" id="progressWrap">
+    <div class="progress-track" id="progressTrack">
+      <div class="progress-fill" id="progressFill"></div>
+      <div class="progress-thumb" id="progressThumb"></div>
+    </div>
+  </div>
+</div>
+
+<div class="track-list" id="trackList">
+  <div class="empty-hint" id="emptyHint">
+    <span>🎵</span>
+    点击「+ 添加」选择音频文件<br>
+    支持 MP3 / WAV / FLAC / OGG / AAC 等
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="*/*" multiple>
+
+<script>
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+const tracks = [];
+let playing = false;
+let startTime = 0;
+let pauseOffset = 0;
+let duration = 0;
+let rafId = null;
+
+const addBtn = document.getElementById('addBtn');
+const playBtn = document.getElementById('playBtn');
+const stopBtn = document.getElementById('stopBtn');
+const fileInput = document.getElementById('fileInput');
+const trackList = document.getElementById('trackList');
+const emptyHint = document.getElementById('emptyHint');
+const progressFill = document.getElementById('progressFill');
+const progressThumb = document.getElementById('progressThumb');
+const progressWrap = document.getElementById('progressWrap');
+const timeCurrent = document.getElementById('timeCurrent');
+const timeTotal = document.getElementById('timeTotal');
+
+addBtn.addEventListener('click', () => {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  for (const file of files) {
+    await loadTrack(file);
+  }
+  fileInput.value = '';
+});
+
+async function loadTrack(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 1.0;
+    gainNode.connect(audioCtx.destination);
+
+    const track = {
+      name: file.name,
+      buffer: audioBuffer,
+      sourceNode: null,
+      gainNode: gainNode,
+      muted: false,
+      volume: 1.0,
+    };
+    tracks.push(track);
+
+    if (audioBuffer.duration > duration) {
+      duration = audioBuffer.duration;
+      timeTotal.textContent = formatTime(duration);
+    }
+
+    renderTrackCard(track);
+    emptyHint.hidden = true;
+
+    if (playing) {
+      startTrackSource(track, pauseOffset + (audioCtx.currentTime - startTime));
+    }
+  } catch (err) {
+    // Show a brief inline error instead of alert
+    const errCard = document.createElement('div');
+    errCard.className = 'track-card';
+    errCard.style.color = 'var(--danger)';
+    errCard.style.fontSize = '0.82rem';
+    errCard.textContent = '无法解码: ' + file.name;
+    trackList.appendChild(errCard);
+    setTimeout(() => errCard.remove(), 4000);
+  }
+}
+
+function renderTrackCard(track) {
+  const card = document.createElement('div');
+  card.className = 'track-card';
+
+  const top = document.createElement('div');
+  top.className = 'track-top';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'track-name';
+  nameSpan.textContent = track.name;
+
+  const muteBtn = document.createElement('button');
+  muteBtn.className = 'btn-mute';
+  muteBtn.textContent = 'ON';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-del';
+  delBtn.textContent = '✕';
+
+  top.append(nameSpan, muteBtn, delBtn);
+
+  const volRow = document.createElement('div');
+  volRow.className = 'volume-row';
+
+  const volIcon = document.createElement('span');
+  volIcon.className = 'volume-icon';
+  volIcon.textContent = '🔊';
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'volume-slider';
+  slider.min = '0';
+  slider.max = '150';
+  slider.value = '100';
+  slider.step = '1';
+
+  const valSpan = document.createElement('span');
+  valSpan.className = 'volume-val';
+  valSpan.textContent = '100%';
+
+  volRow.append(volIcon, slider, valSpan);
+  card.append(top, volRow);
+
+  muteBtn.addEventListener('click', () => {
+    track.muted = !track.muted;
+    muteBtn.textContent = track.muted ? 'OFF' : 'ON';
+    muteBtn.classList.toggle('muted', track.muted);
+    track.gainNode.gain.value = track.muted ? 0 : track.volume;
+  });
+
+  delBtn.addEventListener('click', () => {
+    if (track.sourceNode) {
+      try { track.sourceNode.stop(); } catch(e) {}
+      track.sourceNode = null;
+    }
+    track.gainNode.disconnect();
+    const idx = tracks.indexOf(track);
+    if (idx > -1) tracks.splice(idx, 1);
+    card.remove();
+
+    duration = 0;
+    for (const t of tracks) {
+      if (t.buffer.duration > duration) duration = t.buffer.duration;
+    }
+    timeTotal.textContent = formatTime(duration);
+
+    if (tracks.length === 0) {
+      emptyHint.hidden = false;
+      stopPlayback();
+    }
+  });
+
+  slider.addEventListener('input', () => {
+    track.volume = slider.value / 100;
+    valSpan.textContent = slider.value + '%';
+    if (!track.muted) {
+      track.gainNode.gain.value = track.volume;
+    }
+  });
+
+  trackList.appendChild(card);
+}
+
+// Playback
+playBtn.addEventListener('click', () => {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (playing) pausePlayback();
+  else startPlayback();
+});
+
+stopBtn.addEventListener('click', stopPlayback);
+
+function startTrackSource(track, offset) {
+  if (track.sourceNode) {
+    try { track.sourceNode.stop(); } catch(e) {}
+  }
+  const source = audioCtx.createBufferSource();
+  source.buffer = track.buffer;
+  source.connect(track.gainNode);
+  if (offset < track.buffer.duration) {
+    source.start(0, offset);
+  }
+  track.sourceNode = source;
+}
+
+function startPlayback() {
+  if (tracks.length === 0) return;
+  if (pauseOffset >= duration) pauseOffset = 0;
+
+  for (const track of tracks) {
+    startTrackSource(track, pauseOffset);
+  }
+
+  startTime = audioCtx.currentTime;
+  playing = true;
+  playBtn.textContent = '⏸ 暂停';
+  playBtn.style.background = 'var(--orange)';
+  playBtn.style.color = '#0e1117';
+  updateProgress();
+}
+
+function pausePlayback() {
+  pauseOffset += audioCtx.currentTime - startTime;
+  for (const track of tracks) {
+    if (track.sourceNode) {
+      try { track.sourceNode.stop(); } catch(e) {}
+      track.sourceNode = null;
+    }
+  }
+  playing = false;
+  playBtn.textContent = '▶ 播放';
+  playBtn.style.background = 'var(--green)';
+  playBtn.style.color = '#0e1117';
+  if (rafId) cancelAnimationFrame(rafId);
+}
+
+function stopPlayback() {
+  for (const track of tracks) {
+    if (track.sourceNode) {
+      try { track.sourceNode.stop(); } catch(e) {}
+      track.sourceNode = null;
+    }
+  }
+  playing = false;
+  pauseOffset = 0;
+  playBtn.textContent = '▶ 播放';
+  playBtn.style.background = 'var(--green)';
+  playBtn.style.color = '#0e1117';
+  if (rafId) cancelAnimationFrame(rafId);
+  setProgress(0);
+  timeCurrent.textContent = '00:00';
+}
+
+// Progress bar
+function updateProgress() {
+  if (!playing) return;
+  const elapsed = pauseOffset + (audioCtx.currentTime - startTime);
+  if (elapsed >= duration) { stopPlayback(); return; }
+  setProgress(elapsed / duration);
+  timeCurrent.textContent = formatTime(elapsed);
+  rafId = requestAnimationFrame(updateProgress);
+}
+
+function setProgress(ratio) {
+  const pct = Math.min(Math.max(ratio * 100, 0), 100);
+  progressFill.style.width = pct + '%';
+  progressThumb.style.left = pct + '%';
+}
+
+// Seek via drag
+let dragging = false;
+let wasPl = false;
+
+function seekFromEvent(e) {
+  const rect = progressWrap.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  let ratio = (clientX - rect.left) / rect.width;
+  ratio = Math.min(Math.max(ratio, 0), 1);
+  pauseOffset = ratio * duration;
+  setProgress(ratio);
+  timeCurrent.textContent = formatTime(pauseOffset);
+}
+
+progressWrap.addEventListener('mousedown', (e) => {
+  dragging = true; wasPl = playing;
+  if (playing) pausePlayback();
+  seekFromEvent(e);
+});
+progressWrap.addEventListener('touchstart', (e) => {
+  dragging = true; wasPl = playing;
+  if (playing) pausePlayback();
+  seekFromEvent(e);
+}, { passive: true });
+
+document.addEventListener('mousemove', (e) => { if (dragging) seekFromEvent(e); });
+document.addEventListener('touchmove', (e) => { if (dragging) seekFromEvent(e); }, { passive: true });
+
+document.addEventListener('mouseup', () => { if (dragging) { dragging = false; if (wasPl) startPlayback(); } });
+document.addEventListener('touchend', () => { if (dragging) { dragging = false; if (wasPl) startPlayback(); } });
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+</script>
+
+</body></html>
